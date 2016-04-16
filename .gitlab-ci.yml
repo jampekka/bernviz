@@ -1,4 +1,6 @@
 pages:
+  stage: deploy
+  script: []
   artifacts:
     paths:
     - bernviz
