@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<meta charset="utf-8"> 
+<html>
+<head>
+<!--[if IE]>
+<script src="vendor/es5-shim.min.js"></script>
+<script src="vendor/excanvas.js"></script>
+<![endif]-->
+
+<script type="text/javascript" src="vendor/coffee-script.js"></script>
+<script type="text/javascript" src="vendor/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="vendor/underscore-min.js"></script>
+<script type="text/javascript" src="vendor/signals.min.js"></script>
+<script type="text/javascript" src="vendor/hasher.min.js"></script>
+
+<script type="text/javascript" src="vendor/jquery.flot.min.js"></script>
+<script type="text/javascript" src="vendor/jquery.flot.resize.js"></script>
+<script type="text/javascript" src="vendor/jquery.flot.axislabels.js"></script>
+
+<script type="text/javascript" src="vendor/jquery-deparam.min.js"></script>
+
+<script type="text/javascript" src="vendor/jquery.powertip.js"></script>
+<link rel="stylesheet" href="vendor/jquery.powertip.css">
+
+<link rel="stylesheet" href="vendor/chosen.css">
+<script type="text/javascript" src="vendor/chosen.jquery.js"></script>
+
+<script type="text/javascript" src="vendor/spin.min.js"></script>
+<script type="text/javascript" src="vendor/jquery.spin.js"></script>
+
+<script type="text/javascript" src="vendor/science.v1.min.js"></script>
+
+<script type="text/coffeescript" src="scatter.coffee"></script>
+
+<style type="text/css">
+html{width: 100%; height: 100%; display: relative;}
+body {
+	font-family: Arial, sans-serif;
+	font-size: 14px;
+	color: rgb(34, 34, 34);
+	padding: 0;
+	margin: 0;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	display: table;
+	overflow: hidden;
+}
+
+body > div {
+	display: table-row;
+}
+
+#powerTip {
+	border-radius: 0 !important;
+	color: rgb(243, 243, 243);
+}
+
+#plotwrapper {
+	height: 100%;
+}
+
+#plot {
+	height: 100%;
+}
+
+#powerTip {
+	position: absolute;
+}
+
+.tooltip {
+	margin: 0;
+	padding: 0;
+	line-height: 18px;
+}
+
+.tooltip div {
+	font-size: 18px;
+	margin: 0; padding: 0;
+}
+
+.tooltip dl {
+	margin: 0;
+}
+
+.tooltip dt {
+	font-size: 12px;
+	text-transform: uppercase;
+	padding-top: 6px;
+}
+
+.tooltip dd {
+	font-weight: bold;
+	font-size: 16px;
+	margin-left: 0;
+}
+
+/* Chosen styles */
+ select,
+ .chosen-container,
+ .chosen-select {
+  width: 100% !important;
+}
+ .chosen-container {
+  display: inline-block;
+  margin: auto auto;
+}
+
+.chosen-results li.group-option {
+  padding-left: 15px;
+}
+.chosen-results li,
+.chosen-results li.group-option.highlighted {
+  padding-left: 10px;
+}
+.chosen-results li.highlighted {
+  background: #f5dd34;
+  border-left: 5px solid #444;
+  color: #000;
+  font-size: 13px;
+  padding-left: 5px;
+}
+ .chosen-container-single .chosen-single,
+ .chosen-container-active .chosen-single {
+  border: 1px solid #aaa;
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  border-radius: 0;
+}
+
+/* Button styles */
+ .button {
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #c8c3be;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font-family: arial;
+  font-size: 14px;
+  margin-top: 8px;
+  outline: none;
+  padding: 6px 10px;
+  text-align: center;
+}
+ .slider_selector.selected {
+  background-color: #7db800;
+}
+ .button.search_submit {
+  background-color: #7db800;
+}
+ .button.selected,
+ .button:hover {
+  background-color: #60a300;
+}
+.slider_selector,
+.search_submit {
+  width: auto;
+}
+
+@media (max-width: 578px) {
+ .slider_selector,
+ .search_submit {
+  width: 100%;
+ }
+}
+
+#show_outliers_container {
+	float: right;
+}
+
+#variable_description {
+	font-size: .8571428571428571em;
+	margin-top: 16px;
+	margin-bottom: 16px;
+}
+
+.hoverdetails {
+	border-bottom: .1em dotted;
+	cursor: help;
+}
+</style>
+
+<!--[if IE]>
+<style type="text/css">
+#plot {
+	display: table-cell;
+	height: auto;
+}
+</style>
+<![endif]-->
+
+
+
+</head>
+<body>
+<div id="selector_container">
+<div style="display: none"><select id="party_selector"></select></div>
+<div id="x_selector"></div>
+<div id="variable_description"></div>
+</div>
+<div id="plotwrapper">
+<div id="plot"></div>
+</div> 
+<div id="show_outliers_container">
+<form>
+<label for="show_outliers">Show outliers</label>
+<input type="checkbox" id="show_outliers" />
+</form>
+</div>
+
+<script type="text/coffeescript">
+
+MENU_ITEMS = [
+	['millenial_share', "Millenials"],
+	['female_share', "Females"],
+	['white_share', "Whites"],
+	['black_share', "Blacks"],
+	['hispanic_share', "Hispanics"],
+	]
+
+
+MENU_LABELS = {}
+for [id, label] in MENU_ITEMS
+	MENU_LABELS[id] = label
+
+VARIABLE_DESCRIPTIONS = []
+
+
+
+AXIS_LABELS =
+	millenial_share: 'Age 20 to 34 years population share'
+	female_share: 'Female population share'
+	white_share: 'White population share'
+	black_share: 'Black population share'
+	hispanic_share: 'Hispanic population share'
+
+
+TOOLTIP_LABELS = AXIS_LABELS
+
+PARTY_MAPPINGS = []
+
+PARTY_ORDER = ['kok', 'kesk', 'ps', 'sdp', 'vihr', 'vas', 'rkp', 'kd']
+
+SELECTED_MEPS = ["stubb_alexander___kok",
+"rehn_olli___kesk",
+"halla_aho_jussi___ps",
+"jaakonsaari_liisa___sdp",
+"pietik__inen_sirpa___kok",
+"v__yrynen_paavo___kesk",
+"hautala_heidi___vihr",
+"kyll__nen_merja___vas",
+"virkkunen_henna___kok",
+"torvalds_nils___rkp",
+"j____tteenm__ki_anneli___kesk",
+"terho_sampo___ps",
+"kumpula_natri_miapetra___sdp"]
+
+transform_party = (p) ->
+	[name, party] = p.split(' / ')
+	if party
+		return {
+			name: "#{name}, #{party.toLowerCase()}."
+			role: 'candidate' }
+	
+	if p of PARTY_MAPPINGS
+		return {
+			name: PARTY_MAPPINGS[p]()
+			role: 'party'}
+	return {
+		name: p
+		role: undefined}
+
+value_formatter = (field, value) ->
+	if field in ['mean_income', 'asuntokunnan_k__ytett__viss___oleva_rahatulo__keskiarvo_____']
+		v = Math.round(value).toString()
+		v = v.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+		return v + " &euro;"
+	if field == 'koulutustaso__vktm_indeksi_'
+		value = (value/100).toFixed(2)
+		return value.replace(/\./, ',') + " v"
+	value = parseFloat value
+	return value.toFixed(1).replace(/\./, ',') + " %"
+
+dexss = (s) ->
+	# Replace all but alnum, & and =
+	# with underscores to prevent XSS
+	return s.replace(/[^&=a-z0-9]/g, '_')
+
+dataset = $.deparam(window.location.search[1...]).dataset
+dataset ?= 'demprim2016'
+DATA_PATH = dexss dataset
+
+update_plot = (opts) ->
+	$("#plot").spin()
+	$("#variable_description").text VARIABLE_DESCRIPTIONS[opts.x]
+	opts = _.extend opts, path: DATA_PATH
+	opts.party ?= 'sanders'
+	path = "#{opts.path}/#{opts.party}.json"
+	$.getJSON(path).done (data) ->
+		render_dim_selectors data, opts
+		opts = _.extend opts,
+			axis_labels: AXIS_LABELS
+			tooltip_labels: TOOLTIP_LABELS
+			value_formatter: value_formatter
+		income_vote_scatter($("#plot"), data, opts)
+		$("#plot").spin(false)
+
+render_dim_selectors = (data, opts) ->
+	x_sel = $ "#x_selector"
+	x_sel.empty()
+
+	for [key, label] in MENU_ITEMS
+		if key not of data
+			continue
+		label = MENU_LABELS[key]
+		continue if not label
+		opt = """
+		<input type="button" class="button slider_selector"
+		value="#{label}" data-dim="#{key}"/>
+		"""
+		x_sel.append $ opt
+
+	x_sel.find("[data-dim='#{opts.x}']").addClass('selected')
+	
+	x_sel.find('input').click ->
+		x_sel.find('input').removeClass('selected')
+		$(@).addClass('selected')
+		update_hash x: $(@).data('dim')
+
+render_selector = (data) ->
+	selector = $ "#party_selector"
+	parties = ([k, p] for k, p of data when p.role == 'party')
+	parties = _.sortBy parties, (p) -> p[1].name
+
+	party_grp = $("<optgroup label='Puolueet'>").appendTo selector
+	for id in PARTY_ORDER
+		id_data = data[id]
+		delete data[id]
+
+		party_grp.append $ """
+			<option value="#{id}">#{id_data.name}</option>
+			"""
+	
+	selected_grp = $("<optgroup label='Valitut mepit'>").appendTo selector
+	for id in SELECTED_MEPS
+		id_data = data[id]
+		delete data[id]
+		selected_grp.append $ """
+			<option value="#{id}">#{id_data.name}</option>
+			"""
+
+		
+	candidates = ([k, p] for k, p of data when p.role == 'candidate')
+	candidates = _.sortBy candidates, (p) -> p[1].name.toUpperCase()
+	letter_groups = _.groupBy candidates, (p) -> p[1].name[0].toUpperCase()
+	letter_groups = ([k, p] for k, p of letter_groups)
+	letter_groups = _.sortBy letter_groups, (p) -> p[0]
+	for [grp, grpcands] in letter_groups
+		grp_sel = $("<optgroup label='#{grp}'>").appendTo selector
+		for [id, id_data] in grpcands
+			grp_sel.append $ """
+			<option value="#{id}">#{id_data.name}</option>
+			"""
+
+	selector.chosen()
+	selector.change ->
+		update_hash party: selector.val()
+
+render_selector = (data) ->
+	selector = $ "#party_selector"
+
+	data = ([id, id_data] for id, id_data of data)
+	data = _.sortBy data, (d) -> d[0]
+	for [id, id_data] in data
+		selector.append $ """
+			<option value="#{id}">#{id_data.name}</option>
+			"""
+	selector.chosen()
+	selector.change ->
+		update_hash party: selector.val()
+
+update_selector = (party) ->
+	selector = $ "#party_selector"
+	selector.val(party)
+	current_label = selector.find(':selected').text()
+	AXIS_LABELS.vote_share = "Vote share, #{current_label}"
+	selector.trigger('chosen:updated')
+
+get_safe_hash = ->
+	return dexss hasher.getHash()
+
+update_party = ->
+	opts = $.deparam get_safe_hash()
+	$("#show_outliers").prop "checked", opts.show_outliers == "true"
+	update_selector opts.party
+	update_plot opts
+
+update_hash = (opts) ->
+	current = $.deparam get_safe_hash()
+	current = _.extend current, opts
+	hasher.setHash $.param current
+
+hasher.prependHash = ""
+hasher.changed.add update_party
+hasher.initialized.add update_party
+
+$.getJSON "#{DATA_PATH}/index.json", (data) ->
+	pruned = {}
+	for key, value of data
+		pruned[key] = _.extend value, transform_party value.name
+	render_selector pruned
+	hasher.init()
+
+$("#plot").bind "plotselected", (event, ranges) ->
+	update_hash
+		xmin: ranges.xaxis.from
+		xmax: ranges.xaxis.to
+		ymin: ranges.yaxis.from
+		ymax: ranges.yaxis.to
+
+$("#show_outliers").change ->
+	is_checked = $(@).is(':checked')
+	#console.log is_checked
+	update_hash show_outliers: is_checked
+</script>
+</body>
+</html>
